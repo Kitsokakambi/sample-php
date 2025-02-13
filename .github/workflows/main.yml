@@ -1,0 +1,108 @@
+name: PHP Application CI/CD
+
+on:
+  push:
+    paths:
+      - 'sample-php/**'  # Trigger only when changes are made to the PHP app directory
+  pull_request:
+    paths:
+      - 'sample-php/**'
+
+jobs:
+  build-and-test:
+    runs-on: self-hosted
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      # Set up PHP
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+
+      # Install dependencies and run tests
+      - name: Install PHP dependencies
+        working-directory: ./sample-php
+        run: |
+          composer install
+
+      - name: Run tests for PHP
+        working-directory: ./sample-php
+        run: |
+          ./vendor/bin/phpunit
+
+  dockerize-and-push:
+    runs-on: self-hosted
+    needs: build-and-test
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      # Build and tag Docker image
+      - name: Build Docker image for PHP
+        working-directory: ./sample-php
+        run: |
+          docker build -t sample-php:latest .
+
+      - name: Tag Docker image to ACR
+        working-directory: ./sample-php
+        run: |
+          docker tag sample-php:latest ${{ secrets.ACR_NAME }}.azurecr.io/sample-php:latest
+
+      # Log in to Azure Container Registry (ACR)
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_NAME }}.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      # Push Docker image to ACR
+      - name: Push Docker image for PHP to ACR
+        run: |
+          docker push ${{ secrets.ACR_NAME }}.azurecr.io/sample-php:latest
+
+  deploy:
+    runs-on: self-hosted
+    needs: dockerize-and-push
+    steps:
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      # Set up Azure CLI
+      - name: Install Azure CLI
+        run: |
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+      # Log in to Azure using service principal credentials
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Get AKS credentials
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials --resource-group RGroup --name RGroup-aks
+
+      # Install Helm
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      # Deploy the PHP application using Helm
+      - name: Deploy PHP app to AKS
+        run: |
+          helm upgrade --install sample-php ./helm-charts/sample-php \
+            --set image.repository=${{ secrets.ACR_NAME }}.azurecr.io/sample-php \
+            --set image.tag=latest
