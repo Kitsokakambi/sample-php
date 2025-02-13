@@ -2,11 +2,11 @@ name: PHP Application CI/CD
 
 on:
   push:
-    paths:
-      - 'sample-php/**'  # Trigger only when changes are made to the PHP app directory
+    branches:
+      - main
   pull_request:
-    paths:
-      - 'sample-php/**'
+    branches:
+      - main
 
 jobs:
   build-and-test:
@@ -15,8 +15,6 @@ jobs:
       # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          submodules: 'recursive'
 
       # Set up PHP
       - name: Set up PHP
@@ -26,12 +24,10 @@ jobs:
 
       # Install dependencies and run tests
       - name: Install PHP dependencies
-        working-directory: ./sample-php
         run: |
           composer install
 
       - name: Run tests for PHP
-        working-directory: ./sample-php
         run: |
           ./vendor/bin/phpunit
 
@@ -42,17 +38,13 @@ jobs:
       # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          submodules: 'recursive'
 
       # Build and tag Docker image
       - name: Build Docker image for PHP
-        working-directory: ./sample-php
         run: |
           docker build -t sample-php:latest .
 
       - name: Tag Docker image to ACR
-        working-directory: ./sample-php
         run: |
           docker tag sample-php:latest ${{ secrets.ACR_NAME }}.azurecr.io/sample-php:latest
 
@@ -76,8 +68,6 @@ jobs:
       # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          submodules: 'recursive'
 
       # Set up Azure CLI
       - name: Install Azure CLI
@@ -103,6 +93,6 @@ jobs:
       # Deploy the PHP application using Helm
       - name: Deploy PHP app to AKS
         run: |
-          helm upgrade --install sample-php ./helm-charts/sample-php \
+          helm upgrade --install sample-php ./helm-charts \
             --set image.repository=${{ secrets.ACR_NAME }}.azurecr.io/sample-php \
             --set image.tag=latest
