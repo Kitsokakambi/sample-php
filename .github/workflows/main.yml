@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       # Checkout the repository
       - name: Checkout repository
@@ -32,7 +32,7 @@ jobs:
           ./vendor/bin/phpunit
 
   dockerize-and-push:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: build-and-test
     steps:
       # Checkout the repository
@@ -62,7 +62,7 @@ jobs:
           docker push ${{ secrets.ACR_NAME }}.azurecr.io/sample-php:latest
 
   deploy:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: dockerize-and-push
     steps:
       # Checkout the repository
